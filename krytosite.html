@@ -1,0 +1,2180 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Вселенная Навыков: RPG-навигатор, Билды и Задания</title>
+  <style>
+    :root {
+      --bg: #04060c;
+      --panel: rgba(11, 15, 27, 0.88);
+      --border: rgba(255, 255, 255, 0.11);
+      --text: #eef2ff;
+      --muted: #8b97b8;
+      --accent: #38bdf8;
+      --gold: #fbbf24;
+      --green: #34d399;
+      --build: #22d3ee;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      user-select: none;
+    }
+
+    canvas#graphCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      display: block;
+    }
+
+    canvas#graphCanvas.dragging { cursor: grabbing; }
+
+    .glass {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      border-radius: var(--radius);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.52);
+      pointer-events: auto;
+    }
+
+    /* Верхняя панель */
+    .top-bar {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .top-left {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      pointer-events: none;
+      flex-wrap: wrap;
+    }
+
+    .profile-card { padding: 12px 16px; min-width: 270px; max-width: 330px; }
+
+    .profile-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .class-title { font-size: 15px; font-weight: 800; color: #fff; }
+
+    .lvl-badge {
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(251, 191, 36, 0.16);
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .xp-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .xp-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #38bdf8, #818cf8, #fbbf24);
+      transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .profile-stats {
+      display: flex;
+      gap: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .profile-stats strong { color: var(--text); }
+
+    .builds-toggle-btn {
+      padding: 12px 16px;
+      border: 1px solid rgba(34, 211, 238, 0.4);
+      background: linear-gradient(135deg, rgba(14, 116, 144, 0.42), rgba(30, 27, 75, 0.72));
+      color: #e0f2fe;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .builds-toggle-btn:hover {
+      transform: translateY(-1px);
+      border-color: var(--build);
+      box-shadow: 0 10px 28px rgba(34, 211, 238, 0.25);
+    }
+
+    .builds-toggle-btn .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--build);
+      box-shadow: 0 0 10px var(--build);
+    }
+
+    /* Поиск */
+    .search-wrap { position: relative; width: 330px; max-width: 42vw; }
+
+    .search-box { display: flex; align-items: center; padding: 11px 14px; gap: 8px; }
+
+    .search-box input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .search-box input::placeholder { color: var(--muted); }
+    .search-count { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+    .search-results {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      max-height: 320px;
+      overflow-y: auto;
+      display: none;
+      padding: 6px;
+    }
+
+    .search-results.open { display: block; }
+
+    .search-item {
+      padding: 9px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.15s ease;
+    }
+
+    .search-item:hover { background: rgba(255, 255, 255, 0.08); }
+    .search-item-title { font-size: 13px; font-weight: 600; color: #fff; }
+    .search-item-sub { font-size: 11px; color: var(--muted); }
+
+    .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Панель каталога билдов */
+    .builds-drawer {
+      position: fixed;
+      top: 98px;
+      left: 16px;
+      width: 360px;
+      max-width: calc(100vw - 32px);
+      max-height: calc(100vh - 185px);
+      overflow-y: auto;
+      padding: 18px;
+      z-index: 26;
+      transform: translateX(-400px);
+      opacity: 0;
+      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+    }
+
+    .builds-drawer.open { transform: translateX(0); opacity: 1; }
+
+    .drawer-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .drawer-head h3 { font-size: 16px; font-weight: 800; color: #fff; }
+    .drawer-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; line-height: 1.45; }
+
+    .build-card {
+      padding: 13px 14px;
+      border-radius: 13px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .build-card:hover {
+      background: rgba(255, 255, 255, 0.075);
+      border-color: rgba(34, 211, 238, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .build-card.active { background: rgba(34, 211, 238, 0.12); border-color: var(--build); }
+
+    .build-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+
+    .build-card-title { font-size: 14px; font-weight: 700; color: #fff; }
+    .build-card-pct { font-size: 12px; font-weight: 700; color: var(--build); }
+    .build-card-desc { font-size: 12px; color: var(--muted); line-height: 1.4; margin-bottom: 9px; }
+
+    .build-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+
+    .build-tag {
+      font-size: 10.5px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #cbd5e1;
+    }
+
+    .mini-bar {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .mini-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #22d3ee, #34d399);
+      transition: width 0.35s ease;
+    }
+
+    /* Статус активного билда и маршрута */
+    .status-stack {
+      position: fixed;
+      top: 98px;
+      left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 295px;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .hud-banner { padding: 13px 15px; display: none; pointer-events: auto; }
+    .hud-banner.open { display: block; }
+    .hud-banner h4 { font-size: 13.5px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+    .hud-banner p { font-size: 12px; color: #cbd5e1; margin-bottom: 10px; line-height: 1.4; }
+
+    .hud-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .hud-actions button {
+      flex: 1;
+      padding: 7px 10px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.07);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .hud-actions button:hover { background: rgba(255, 255, 255, 0.14); }
+    .hud-actions button.primary {
+      background: rgba(34, 211, 238, 0.2);
+      border-color: rgba(34, 211, 238, 0.5);
+      color: #cffafe;
+    }
+
+    /* Нижняя панель сфер */
+    .domain-bar {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px;
+      max-width: calc(100vw - 32px);
+      overflow-x: auto;
+      z-index: 20;
+    }
+
+    .domain-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 12px;
+      border-radius: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      color: #dbe4ff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .domain-pill:hover { background: rgba(255, 255, 255, 0.11); transform: translateY(-1px); }
+
+    /* Кнопки камеры */
+    .controls {
+      position: fixed;
+      bottom: 76px;
+      left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 6px;
+      z-index: 20;
+    }
+
+    .ctrl-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .ctrl-btn:hover { background: rgba(255, 255, 255, 0.14); }
+    .ctrl-btn.active { border-color: var(--accent); color: var(--accent); }
+
+    /* Инспектор узла с пошаговыми заданиями */
+    .inspector {
+      position: fixed;
+      top: 82px;
+      right: 16px;
+      width: 385px;
+      max-width: calc(100vw - 32px);
+      max-height: calc(100vh - 165px);
+      overflow-y: auto;
+      padding: 20px;
+      z-index: 25;
+      transform: translateX(420px);
+      opacity: 0;
+      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+    }
+
+    .inspector.open { transform: translateX(0); opacity: 1; }
+
+    .insp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .insp-crumb {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .insp-title { font-size: 19px; font-weight: 800; line-height: 1.25; color: #fff; }
+
+    .close-btn {
+      background: rgba(255, 255, 255, 0.07);
+      border: none;
+      color: var(--muted);
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .close-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.15); }
+
+    .insp-desc { font-size: 13px; color: #c2cce5; line-height: 1.5; margin: 10px 0 12px; }
+
+    .insp-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .meta-box {
+      padding: 9px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .meta-box span { display: block; font-size: 11px; color: var(--muted); }
+    .meta-box strong { font-size: 14px; color: #fff; }
+
+    /* Блок пошаговых заданий */
+    .tasks-box {
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      margin-bottom: 14px;
+    }
+
+    .tasks-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .tasks-head b {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #7dd3fc;
+    }
+
+    .tasks-counter {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--green);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .task-item:hover {
+      background: rgba(255, 255, 255, 0.075);
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+
+    .task-item.done {
+      background: rgba(52, 211, 153, 0.09);
+      border-color: rgba(52, 211, 153, 0.32);
+    }
+
+    .task-check {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      border: 2px solid rgba(148, 163, 184, 0.6);
+      flex-shrink: 0;
+      margin-top: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: #04130d;
+      transition: all 0.15s ease;
+    }
+
+    .task-item.done .task-check {
+      background: var(--green);
+      border-color: var(--green);
+    }
+
+    .task-text {
+      font-size: 12.5px;
+      line-height: 1.42;
+      color: #e2e8f0;
+    }
+
+    .task-item.done .task-text {
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+
+    .task-verify {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+      font-size: 12px;
+      color: #fde68a;
+      line-height: 1.4;
+    }
+
+    .task-verify span { color: var(--muted); font-weight: 600; }
+
+    .btn-primary, .btn-secondary {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .btn-primary.ready {
+      background: linear-gradient(135deg, #10b981, #22d3ee);
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+    }
+
+    .btn-primary.unlocked {
+      background: rgba(52, 211, 153, 0.16);
+      border: 1px solid rgba(52, 211, 153, 0.45);
+      color: #6ee7b7;
+    }
+
+    .btn-primary:disabled { opacity: 0.42; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .btn-link {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px;
+      text-decoration: underline;
+      display: none;
+    }
+
+    .btn-link:hover { color: #e2e8f0; }
+
+    .btn-primary:hover:not(:disabled), .btn-secondary:hover { transform: translateY(-1px); }
+
+    .tooltip {
+      position: fixed;
+      pointer-events: none;
+      padding: 7px 11px;
+      border-radius: 10px;
+      background: rgba(8, 11, 20, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 12px;
+      color: #fff;
+      z-index: 30;
+      display: none;
+      max-width: 250px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    .tooltip span { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <canvas id="graphCanvas"></canvas>
+
+  <!-- Верхняя панель -->
+  <div class="top-bar">
+    <div class="top-left">
+      <div class="glass profile-card">
+        <div class="profile-top">
+          <div class="class-title" id="classTitle">Странник Знаний</div>
+          <div class="lvl-badge" id="levelBadge">Уровень 1</div>
+        </div>
+        <div class="xp-track"><div class="xp-fill" id="xpFill"></div></div>
+        <div class="profile-stats">
+          <span>Узлов: <strong id="unlockedCount">1</strong> / <b id="totalCount">0</b></span>
+          <span>XP: <strong id="xpText">0</strong></span>
+          <span>Опыт: <strong id="hoursText">0 ч</strong></span>
+        </div>
+      </div>
+
+      <button class="glass builds-toggle-btn" id="openBuildsBtn">
+        <span class="pulse-dot"></span>
+        <span>Готовые билды</span>
+      </button>
+    </div>
+
+    <div class="search-wrap">
+      <div class="glass search-box">
+        <input type="text" id="searchInput" placeholder="Поиск среди 2000+ навыков (Roblox, AI, дизайн...)" />
+        <span class="search-count">Поиск</span>
+      </div>
+      <div class="glass search-results" id="searchResults"></div>
+    </div>
+  </div>
+
+  <!-- Каталог готовых билдов -->
+  <aside class="glass builds-drawer" id="buildsDrawer">
+    <div class="drawer-head">
+      <h3>Готовые билды профессий</h3>
+      <button class="close-btn" id="closeBuildsBtn">×</button>
+    </div>
+    <p class="drawer-sub">Выбери цель: карта подсветит нужное созвездие навыков сразу из нескольких сфер и покажет процент готовности.</p>
+    <div id="buildsList"></div>
+  </aside>
+
+  <!-- Статус активного билда и GPS-маршрута -->
+  <div class="status-stack">
+    <div class="glass hud-banner" id="buildBanner">
+      <h4>
+        <span id="buildBannerTitle" style="color:#22d3ee;">Активный билд</span>
+        <span id="buildBannerPct" style="color:#34d399;">0%</span>
+      </h4>
+      <div class="mini-bar" style="margin-bottom:8px;"><div class="mini-bar-fill" id="buildBannerBar" style="width:0%"></div></div>
+      <p id="buildBannerInfo"></p>
+      <div class="hud-actions">
+        <button class="primary" id="buildNextBtn">Следующий шаг</button>
+        <button id="buildClearBtn">Снять</button>
+      </div>
+    </div>
+
+    <div class="glass hud-banner" id="routeBanner">
+      <h4 style="color:#fbbf24;">Маршрут к цели</h4>
+      <p id="routeInfo"></p>
+      <div class="hud-actions">
+        <button id="routeNextBtn">К шагу</button>
+        <button id="routeClearBtn">Сбросить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Кнопки управления -->
+  <div class="glass controls">
+    <button class="ctrl-btn" id="zoomInBtn" title="Приблизить">+</button>
+    <button class="ctrl-btn" id="zoomOutBtn" title="Отдалить">-</button>
+    <button class="ctrl-btn" id="fitBtn" title="Показать всю карту">◎</button>
+    <button class="ctrl-btn active" id="soundBtn" title="Вкл/выкл звук">♪</button>
+    <button class="ctrl-btn" id="resetBtn" title="Сбросить прогресс">↺</button>
+  </div>
+
+  <!-- Панель сфер -->
+  <div class="glass domain-bar" id="domainBar"></div>
+
+  <!-- Инспектор узла с пошаговыми заданиями -->
+  <aside class="glass inspector" id="inspector">
+    <div class="insp-header">
+      <div>
+        <div class="insp-crumb" id="inspCrumb">Сфера</div>
+        <h2 class="insp-title" id="inspTitle">Название узла</h2>
+      </div>
+      <button class="close-btn" id="closeInspBtn">×</button>
+    </div>
+
+    <p class="insp-desc" id="inspDesc"></p>
+
+    <div class="insp-meta">
+      <div class="meta-box">
+        <span>Награда за освоение</span>
+        <strong id="inspXp">+100 XP</strong>
+      </div>
+      <div class="meta-box">
+        <span>Оценка времени</span>
+        <strong id="inspHours">12 часов</strong>
+      </div>
+    </div>
+
+    <!-- Чек-лист точных заданий -->
+    <div class="tasks-box">
+      <div class="tasks-head">
+        <b>Что именно сделать (задания)</b>
+        <span class="tasks-counter" id="tasksCounter">0 / 4</span>
+      </div>
+      <div class="mini-bar"><div class="mini-bar-fill" id="tasksBar" style="width:0%"></div></div>
+      <div class="task-list" id="taskList"></div>
+      <div class="task-verify" id="taskVerify"></div>
+    </div>
+
+    <button class="btn-primary" id="unlockBtn">Выполни задания выше</button>
+    <button class="btn-secondary" id="routeBtn">Проложить маршрут до этого узла</button>
+    <button class="btn-link" id="skipBtn">Я уже умею это на практике, открыть узел сразу</button>
+  </aside>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script>
+    // =========================================================================
+    // 1. БАЗА ДАННЫХ: 8 СФЕР, 48 СПЕЦИАЛИЗАЦИЙ, 288 ТЕМ, 2100+ УЗЛОВ
+    // =========================================================================
+    const DOMAINS = [
+      {
+        id: 'it',
+        name: 'Программирование и IT',
+        color: '#38bdf8',
+        rpgClass: 'Архитектор Кода',
+        t4: ['Синтаксис и паттерны', 'Отладка и профилирование', 'Архитектура модулей'],
+        t5: ['Автотесты и рефакторинг', 'Боевой проект в портфолио'],
+        specs: [
+          { name: 'Frontend', topics: ['HTML/CSS и сетки', 'JavaScript ES2025', 'TypeScript', 'React и состояние', 'Web-анимации и Canvas', 'Оптимизация Web Vitals'] },
+          { name: 'Backend', topics: ['REST и GraphQL API', 'SQL и индексы', 'NoSQL и кэш Redis', 'Аутентификация и OAuth', 'Очереди и микросервисы', 'Высокие нагрузки'] },
+          { name: 'AI и Machine Learning', topics: ['Python для Data Science', 'Классический ML', 'Нейросети и PyTorch', 'LLM и промпт-инжиниринг', 'RAG и векторные базы', 'AI-агенты и инструменты'] },
+          { name: 'DevOps и Облака', topics: ['Linux и Bash', 'Docker и контейнеры', 'Kubernetes', 'CI/CD пайплайны', 'Мониторинг и логи', 'Облачная инфраструктура'] },
+          { name: 'Кибербезопасность', topics: ['Сети и TCP/IP', 'Криптография', 'Веб-уязвимости OWASP', 'Пентест и аудит', 'Защита серверов', 'Безопасная разработка'] },
+          { name: 'Мобильная разработка', topics: ['Swift и iOS UI', 'Kotlin и Android', 'Flutter кроссплатформа', 'Офлайн-базы и синк', 'Нативные анимации', 'Публикация в сторах'] }
+        ]
+      },
+      {
+        id: 'gamedev',
+        name: 'Геймдев и 3D',
+        color: '#a855f7',
+        rpgClass: 'Творец Миров',
+        t4: ['Базовая механика', 'Оптимизация и физика', 'Полишинг и game feel'],
+        t5: ['Мультиплеерная симуляция', 'Играбельный прототип'],
+        specs: [
+          { name: 'Roblox и Luau', topics: ['Скриптинг на Luau', 'Клиент-сервер и Remotes', 'Физика и конвейеры', 'DataStore и экономика', 'NPC и Pathfinding', 'Монетизация и аналитика'] },
+          { name: 'Unreal Engine 5', topics: ['Blueprints и C++', 'Lumen и Nanite', 'Анимация и Control Rig', 'Сетевой код и репликация', 'Niagara VFX', 'Оптимизация FPS'] },
+          { name: 'Unity и C#', topics: ['C# и архитектура сцен', '2D/3D физика', 'ScriptableObjects', 'Shader Graph', 'Мобильный билд', 'DOTS и производительность'] },
+          { name: 'Геймдизайн', topics: ['Core Loop и удержание', 'Баланс и экономика', 'Левел-дизайн', 'Нарратив и лор', 'Плейтесты и метрики', 'Кооп-механики'] },
+          { name: '3D-моделирование', topics: ['Blender и сетка', 'Скульптинг персонажей', 'UV-развертка', 'PBR-текстуринг', 'Риггинг и скиннинг', 'Стилизованный арт'] },
+          { name: 'Игровой звук', topics: ['Саунд-дизайн SFX', 'Адаптивная музыка', 'FMOD и Wwise', 'Пространственный звук', 'Сведение микса', 'Озвучка персонажей'] }
+        ]
+      },
+      {
+        id: 'design',
+        name: 'Дизайн и Креатив',
+        color: '#f472b6',
+        rpgClass: 'Мастер Формы',
+        t4: ['Композиция и теория', 'Инструменты и сетки', 'Визуальная система'],
+        t5: ['Интерактивный концепт', 'Кейс для портфолио'],
+        specs: [
+          { name: 'UI/UX дизайн', topics: ['Пользовательские сценарии', 'Figma и Auto Layout', 'Дизайн-системы', 'Микроанимации UI', 'Юзабилити-тесты', 'Доступность интерфейсов'] },
+          { name: 'Графический дизайн', topics: ['Типографика и шрифты', 'Теория цвета', 'Брендинг и айдентика', 'Постеры и верстка', 'Упаковка продуктов', 'Гайдлайны бренда'] },
+          { name: 'Моушн-дизайн', topics: ['12 принципов анимации', 'After Effects и ключи', '3D-моушн и камеры', 'Кинетическая типографика', 'Титры и заставки', 'Экспорт под соцсети'] },
+          { name: 'Иллюстрация', topics: ['Анатомия и силуэт', 'Свет и рендер', 'Перспектива миров', 'Концепт-арт персонажей', 'Окружение и пропсы', 'Собственный стиль'] },
+          { name: 'Архитектура и интерьеры', topics: ['Эргономика пространства', 'Светодизайн', 'Материалы и фактуры', 'Чертежи и планировки', 'Визуализация сцен', 'Урбанистика'] },
+          { name: 'Промышленный дизайн', topics: ['Скетчинг объектов', 'CAD-моделирование', 'Прототипирование 3D-печатью', 'Эргономика гаджетов', 'Материаловедение', 'Серийное производство'] }
+        ]
+      },
+      {
+        id: 'business',
+        name: 'Бизнес и Финансы',
+        color: '#fbbf24',
+        rpgClass: 'Стратег Империи',
+        t4: ['Модели и метрики', 'Анализ реальных кейсов', 'Принятие решений'],
+        t5: ['Финансовый расчет', 'Запуск пилота на рынке'],
+        specs: [
+          { name: 'Стартапы и запуск', topics: ['Поиск реальных проблем', 'CustDev интервью', 'Сборка MVP за неделю', 'Юнит-экономика', 'Питч-дек инвесторам', 'Масштабирование'] },
+          { name: 'Продукт-менеджмент', topics: ['Приоритизация бэклога', 'Продуктовая аналитика', 'A/B-эксперименты', 'Retention и воронки', 'Монетизация и тарифы', 'Дорожная карта'] },
+          { name: 'Личные финансы', topics: ['Учет бюджета и подушка', 'Сложный процент', 'Индексные фонды ETF', 'Облигации и риск-профиль', 'Налоговая оптимизация', 'План на 10 лет'] },
+          { name: 'Маркетинг и рост', topics: ['Позиционирование', 'Таргет и контекст', 'SEO и органика', 'Виральные механики', 'Контент-воронки', 'Комьюнити-менеджмент'] },
+          { name: 'Продажи и B2B', topics: ['Выявление потребностей', 'Работа с возражениями', 'Холодный аутрич', 'Коммерческие предложения', 'Долгие сделки и CRM', 'Удержание клиентов'] },
+          { name: 'Управление командой', topics: ['Найм сильных людей', 'Постановка целей OKR', 'Обратная связь 1-on-1', 'Делегирование задач', 'Антикризисное управление', 'Культура команды'] }
+        ]
+      },
+      {
+        id: 'science',
+        name: 'Наука и Инженерия',
+        color: '#34d399',
+        rpgClass: 'Первооткрыватель',
+        t4: ['Фундаментальные законы', 'Математический аппарат', 'Эксперимент и модели'],
+        t5: ['Симуляция процесса', 'Исследовательская работа'],
+        specs: [
+          { name: 'Математика', topics: ['Линейная алгебра', 'Матанализ и производные', 'Теория вероятностей', 'Математическая статистика', 'Дискретная математика', 'Теория графов'] },
+          { name: 'Физика', topics: ['Классическая механика', 'Электромагнетизм', 'Термодинамика', 'Оптика и волны', 'Квантовая механика', 'Астрофизика'] },
+          { name: 'Робототехника', topics: ['Кинематика манипуляторов', 'Датчики и лидары', 'PID-регуляторы', 'Компьютерное зрение', 'ROS2 архитектура', 'Автономная навигация'] },
+          { name: 'Электроника и DIY', topics: ['Схемотехника и пайка', 'Arduino и ESP32', 'Разводка печатных плат', 'Питание и аккумуляторы', 'Умный дом и IoT', 'Измерения осциллографом'] },
+          { name: 'Биология и биотех', topics: ['Генетика и ДНК', 'Нейробиология мозга', 'Микробиология', 'Биоинформатика', 'Фармакология', 'Эволюционные модели'] },
+          { name: 'Космос и авиация', topics: ['Орбитальная механика', 'Аэродинамика крыла', 'Ракетные двигатели', 'Спутниковая связь', 'Дроны и автопилоты', 'Навигационные системы'] }
+        ]
+      },
+      {
+        id: 'media',
+        name: 'Медиа и Контент',
+        color: '#fb7185',
+        rpgClass: 'Мастер Историй',
+        t4: ['Драматургия и ритм', 'Техническая сборка', 'Удержание внимания'],
+        t5: ['Пакетная продакшн-система', 'Выпуск готового формата'],
+        specs: [
+          { name: 'Видеомонтаж', topics: ['Ритм и склейки', 'Цветокоррекция DaVinci', 'Динамика для Shorts/Reels', 'Саунд-дизайн видео', 'Эффекты и трекинг', 'Ускорение пайплайна'] },
+          { name: 'YouTube и каналы', topics: ['Кликабельные превью', 'Хуки первых 15 секунд', 'Анализ удержания', 'Сценарии длинных видео', 'Свет и кадр в студии', 'Спонсоры и интеграции'] },
+          { name: 'Копирайтинг и тексты', topics: ['Сильный текст без воды', 'Сторителлинг', 'Продающие лендинги', 'Сценарии и диалоги', 'Редактура и структура', 'Рассылки и блоги'] },
+          { name: 'Стриминг и шоу', topics: ['Настройка OBS и сцен', 'Интерактив с чатом', 'Качественный микрофон', 'Шоу-форматы и ивенты', 'Клипы и нарезки', 'Построение фан-базы'] },
+          { name: 'Фотография', topics: ['Экспозиция и свет', 'Портретная съемка', 'Уличный репортаж', 'Ретушь в Lightroom', 'Предметная съемка', 'Визуальные серии'] },
+          { name: 'Музыка и продакшн', topics: ['Теория гармонии', 'Аранжировка в DAW', 'Синтез звука', 'Битмейкинг и грув', 'Сведение и мастеринг', 'Выпуск релиза'] }
+        ]
+      },
+      {
+        id: 'lang',
+        name: 'Языки и Психология',
+        color: '#2dd4bf',
+        rpgClass: 'Дипломат Умов',
+        t4: ['Базовые структуры', 'Погружение и практика', 'Свободное применение'],
+        t5: ['Сложные ситуации', 'Свободный уровень'],
+        specs: [
+          { name: 'Английский язык', topics: ['Базовая грамматика', 'Аудирование носителей', 'Технический английский', 'Разговорная беглость', 'Деловая переписка', 'Подготовка к IELTS/C1'] },
+          { name: 'Восточные языки', topics: ['Японский: хирагана и канзи', 'Японский: разговорный', 'Корейский хангыль', 'Китайские тоны', 'Чтение оригиналов', 'Культурный контекст'] },
+          { name: 'Европейские языки', topics: ['Испанский для жизни', 'Немецкий и структура', 'Французская фонетика', 'Итальянский разговорный', 'Интервальное повторение', 'Мышление на языке'] },
+          { name: 'Риторика и речь', topics: ['Дикция и голос', 'Структура выступления', 'Работа с волнением', 'Аргументация в споре', 'Презентации перед залом', 'Импровизация'] },
+          { name: 'Психология и мышление', topics: ['Когнитивные искажения', 'Эмоциональный интеллект', 'Привычки и дофамин', 'Стрессоустойчивость', 'Критическое мышление', 'Понимание мотивации'] },
+          { name: 'Переговоры и обучение', topics: ['Win-Win стратегии', 'Жесткие переговоры', 'Обучение через практику', 'Менторство и фасилитация', 'Конспекты и база знаний', 'Быстрое чтение и синтез'] }
+        ]
+      },
+      {
+        id: 'life',
+        name: 'Здоровье и Жизнь',
+        color: '#fb923c',
+        rpgClass: 'Мастер Баланса',
+        t4: ['Принципы и физиология', 'Внедрение в рутину', 'Отслеживание прогресса'],
+        t5: ['Устойчивая система', 'Личный рекорд'],
+        specs: [
+          { name: 'Силовой тренинг', topics: ['Техника базовых движений', 'Прогрессия нагрузок', 'Калистеника со своим весом', 'Восстановление мышц', 'Периодизация программ', 'Профилактика травм'] },
+          { name: 'Выносливость и спорт', topics: ['Бег в пульсовых зонах', 'Плавание и дыхание', 'Велоспорт и маршруты', 'Мобильность и растяжка', 'Координация и баланс', 'Подготовка к старту'] },
+          { name: 'Сон и биохакинг', topics: ['Циркадные ритмы', 'Гигиена глубокого сна', 'Энергия без выгорания', 'Управление вниманием', 'Чекапы и анализы', 'Холод и закаливание'] },
+          { name: 'Кулинария и питание', topics: ['Баланс БЖУ и калорий', 'Техника ножа и соусы', 'Быстрые рационы на неделю', 'Выпечка и ферментация', 'Кофе и альтернатива', 'Осознанное питание'] },
+          { name: 'Продуктивность', topics: ['Глубокая работа Deep Work', 'Планирование недели', 'Борьба с прокрастинацией', 'Цифровой минимализм', 'Личная база знаний', 'Энерджи-менеджмент'] },
+          { name: 'Путешествия и автономность', topics: ['Планирование маршрутов', 'Походы и снаряжение', 'Первая помощь', 'Жизнь на удаленке', 'Бюджетные перелеты', 'Ориентирование на местности'] }
+        ]
+      }
+    ];
+
+    // Точные прописанные задания для ключевых узлов (Tier 3)
+    const CUSTOM_TASKS = {
+      'Скриптинг на Luau': {
+        steps: [
+          'Открой Roblox Studio, создай Script в ServerScriptService и выведи в Output имена всех входящих игроков через Players.PlayerAdded.',
+          'Создай Part на карте и привяжи к нему ProximityPrompt, который меняет цвет блока и выдает +10 очков в leaderstats.',
+          'Добавь защиту от спама (debounce на 1 секунду) и цикл while task.wait(5), который спавнит бонусную монету в случайной точке.'
+        ],
+        verify: 'Сцена запускается без красных ошибок в Output, монеты спавнятся, очки стабильно начисляются.'
+      },
+      'Клиент-сервер и Remotes': {
+        steps: [
+          'Создай RemoteEvent в ReplicatedStorage и LocalScript в StarterPlayerScripts с кнопкой на экране (ScreenGui).',
+          'По клику отправляй FireServer() на сервер, а на сервере проверяй баланс игрока перед выдачей предмета (защита от читеров).',
+          'Отправляй обновленный инвентарь обратно клиенту через FireClient() и обновляй текст в интерфейсе.'
+        ],
+        verify: 'Запусти Local Server на 2 игроков в Roblox Studio: покупка одного игрока не ломает интерфейс второго.'
+      },
+      'Физика и конвейеры': {
+        steps: [
+          'Создай ленту конвейера (Anchored Part) и задай ей AssemblyLinearVelocity, чтобы физические блоки ехали вперед.',
+          'Сделай катапульту или пушку, которая запускает Unanchored детали по параболе через ApplyImpulse.',
+          'Поставь приемную зону с событием Touched, которая уничтожает долетевший блок и засчитывает его в общий счетчик.'
+        ],
+        verify: '10 подряд запущенных блоков стабильно едут по конвейеру или долетают в приемник без проваливания под карту.'
+      },
+      'DataStore и экономика': {
+        steps: [
+          'Включи API Services в Game Settings и подключи DataStoreService:GetDataStore().',
+          'Реализуй загрузку золота игрока при входе (PlayerAdded) и сохранение при выходе (PlayerRemoving) внутри pcall().',
+          'Добавь game:BindToClose(), чтобы данные гарантированно сохранялись при остановке сервера.'
+        ],
+        verify: 'Накопи 50 монет в тесте, выйди и перезапусти Play: баланс остался на месте.'
+      },
+      'NPC и Pathfinding': {
+        steps: [
+          'Собери простого NPC с Humanoid и HumanoidRootPart и поставь на карте 2–3 препятствия.',
+          'Подключи PathfindingService:CreatePath(), просчитай путь до цели и проведи NPC по всем точкам Waypoints.',
+          'Сделай цикл рабочего: NPC идет к складу, ждет 1 секунду, несет предмет на стройку и повторяет маршрут.'
+        ],
+        verify: 'NPC уверенно обходит стены и не застревает на углах в течение 2 минут непрерывной работы.'
+      },
+      'HTML/CSS и сетки': {
+        steps: [
+          'Сверстай адаптивную карточку товара или профиля с помощью CSS Grid и Flexbox без использования таблиц.',
+          'Добавь CSS-переменные (:root) для цветов и отступов, а также плавные hover-эффекты через transition.',
+          'Проверь верстку в DevTools на ширине 375px (телефон) и 1440px (ноутбук) и убери горизонтальный скролл.'
+        ],
+        verify: 'Страница ровно перестраивается с 3 колонок в 1 на мобильном экране, ни один элемент не вылезает за границы.'
+      },
+      'JavaScript ES2025': {
+        steps: [
+          'Напиши мини-приложение списка задач (To-Do) с добавлением, фильтрацией и удалением через делегирование событий.',
+          'Перепиши работу с данными через методы массивов map/filter/reduce и деструктуризацию объектов.',
+          'Добавь сохранение в localStorage и один асинхронный fetch-запрос к открытому API с обработкой try/catch.'
+        ],
+        verify: 'После перезагрузки страницы задачи сохраняются, а в консоли браузера нет ни одной ошибки.'
+      },
+      'Web-анимации и Canvas': {
+        steps: [
+          'Создай полноэкранный элемент canvas с учетом devicePixelRatio для четкости на Retina-экранах.',
+          'Реализуй цикл requestAnimationFrame с расчетом deltaTime и 50 частицами, которые отталкиваются от курсора мыши.',
+          'Добавь плавное затухание шлейфа и переключатель цвета частиц.'
+        ],
+        verify: 'Анимация держит стабильные 60 FPS при движении мыши и корректно подстраивается под изменение размера окна.'
+      },
+      'LLM и промпт-инжиниринг': {
+        steps: [
+          'Выбери одну реальную рабочую задачу и сформулируй системный промпт с ролью, ограничениями и форматом вывода (JSON или таблица).',
+          'Добавь 2–3 примера (few-shot) и прогони 5 сложных граничных запросов, фиксируя ошибки модели.',
+          'Улучши промпт так, чтобы модель не выдумывала факты и стабильно держала нужную структуру.'
+        ],
+        verify: 'На всех 5 тестовых запросах модель выдает валидный результат без ручных правок.'
+      },
+      'AI-агенты и инструменты': {
+        steps: [
+          'Спроектируй цикл агента: получение цели, выбор инструмента (function calling), чтение результата и следующий шаг.',
+          'Подключи к LLM 2 простых инструмента (например, калькулятор и поиск по локальным заметкам) со строгой JSON-схемой.',
+          'Добавь защиту от зацикливания (лимит шагов) и логирование каждого вызова инструмента.'
+        ],
+        verify: 'Агент самостоятельно решает многошаговую задачу, вызывая оба инструмента в правильном порядке.'
+      },
+      'Blender и сетка': {
+        steps: [
+          'Смоделируй low-poly объект (например, сундук, меч или египетскую колонну), используя Extrude, Inset и Bevel.',
+          'Проверь топологию: убери лишние N-гоны, двойные вершины (Merge by Distance) и выверни нормали наружу.',
+          'Примени Scale (Ctrl+A), выставь Origin в основание модели и экспортируй ее в формат FBX или GLTF.'
+        ],
+        verify: 'Модель корректно импортируется в игровой движок без дыр в полигонах и с правильным масштабом.'
+      },
+      'Figma и Auto Layout': {
+        steps: [
+          'Собери компонент кнопки с 3 состояниями (Default, Hover, Disabled) через Variants и Auto Layout.',
+          'Сверстай экран мобильного приложения, используя только вложенные фреймы Auto Layout и сетку 8px.',
+          'Проверь, как ведет себя макет при изменении длины текста в заголовках и кнопках.'
+        ],
+        verify: 'При растягивании главного фрейма все карточки и кнопки перестраиваются автоматически без наложений.'
+      },
+      'Поиск реальных проблем': {
+        steps: [
+          'Выпиши 10 раздражающих мелочей, с которыми ты или твои знакомые столкнулись за последние 2 недели.',
+          'Найди в Reddit, Telegram или отзывах App Store минимум 15 жалоб людей на существующие решения по одной из этих тем.',
+          'Сформулируй гипотезу в одном предложении: кто клиент, какая боль и за какой результат он готов заплатить.'
+        ],
+        verify: 'Есть таблица из 15 реальных цитат пользователей, подтверждающих, что проблема регулярная и болезненная.'
+      },
+      'Сборка MVP за неделю': {
+        steps: [
+          'Отрежь 80% второстепенных фич и оставь ровно одно главное действие, ради которого пользователь откроет сайт.',
+          'Собери рабочий кликабельный прототип за 3–5 дней на готовых шаблонах или одном файле без сложного бэкенда.',
+          'Покажи прототип 5 реальным людям и запиши, на каком экране они споткнулись или задали вопрос.'
+        ],
+        verify: 'Прототип открывается по ссылке, решает главную задачу без твоих пояснений и прошел 5 живых тестов.'
+      },
+      'Учет бюджета и подушка': {
+        steps: [
+          'Выгрузи траты за последние 30 дней из банковских приложений и разбей их на 5 категорий.',
+          'Посчитай обязательный минимум расходов на 1 месяц и умножь на 3 (целевой размер базовой подушки безопасности).',
+          'Настрой автоматический перевод 10–15% от каждого поступления на отдельный накопительный счет.'
+        ],
+        verify: 'Ты точно знаешь свою цифру обязательных трат в месяц и открыл отдельный счет под подушку.'
+      },
+      'Кликабельные превью': {
+        steps: [
+          'Собери доску из 10 самых кликабельных обложек в твоей нише и отметь на них главный объект, контраст и текст.',
+          'Сделай 3 разных варианта превью для одного ролика, используя максимум 3 слова крупным шрифтом.',
+          'Уменьши все 3 варианта до размера иконки телефона (150px по ширине) и оставь тот, который читается за 1 секунду.'
+        ],
+        verify: 'Смысл и эмоция обложки считываются мгновенно даже в миниатюрном размере.'
+      }
+    };
+
+    // Генератор точных пошаговых заданий для любого из 2100+ узлов
+    function getNodeTasks(node) {
+      if (node.tier === 0) {
+        return {
+          steps: [
+            'Открой панель «Готовые билды» слева вверху и посмотри, какие профессии тебе ближе всего.',
+            'Приблизь любую из 8 цветных сфер колесиком мыши и кликни на интересующий узел.',
+            'Открой свой первый базовый узел первого уровня, чтобы запустить рост ветки.'
+          ],
+          verify: 'Выбрано направление старта и проложен первый маршрут на карте.'
+        };
+      }
+
+      if (node.tier === 1) {
+        return {
+          steps: [
+            `Просмотри все 6 специализаций внутри ветки «${node.title}» и выпиши 2, которые вызывают наибольший интерес.`,
+            `Найди 1 качественный обзорный ролик или статью о том, чем специалисты в «${node.title}» занимаются каждый день.`,
+            `Определи главную цель на ближайшие 30 дней в сфере «${node.title}» и выбери первую специализацию.`
+          ],
+          verify: 'Ты понимаешь карту направления и выбрал конкретную ветку второго уровня для погружения.'
+        };
+      }
+
+      if (node.tier === 2) {
+        return {
+          steps: [
+            `Установи и настрой главный рабочий инструмент для направления «${node.title}» на своем компьютере.`,
+            `Изучи 6 дочерних тем внутри «${node.title}» и отметь для себя порядок их прохождения.`,
+            `Создай отдельную папку проекта или карточку в базе знаний для конспектов и артефактов по «${node.title}».`
+          ],
+          verify: 'Рабочая среда полностью настроена, а место для хранения практики готово.'
+        };
+      }
+
+      if (node.tier === 3 && CUSTOM_TASKS[node.title]) {
+        return CUSTOM_TASKS[node.title];
+      }
+
+      // Для остальных тем Tier 3 и всех подуровней Tier 4 / Tier 5 формируем точные отраслевые шаги
+      const d = node.domainId;
+      const baseTopic = node.title.split(':')[0].trim();
+      const stepLabel = node.title.includes(':') ? node.title.split(':')[1].trim() : '';
+
+      if (node.tier === 3) {
+        const domainTemplates = {
+          it: {
+            steps: [
+              `Изучи официальную документацию по теме «${node.title}» и выпиши 5 ключевых понятий своими словами.`,
+              `Напиши с нуля небольшой рабочий скрипт или модуль, применяющий «${node.title}» без копипаста из гайда.`,
+              `Сломай свой код намеренно 2 способами, прочитай сообщения об ошибках и исправь их.`
+            ],
+            verify: `Код по теме «${node.title}» запускается чисто, и ты можешь объяснить каждую его строку.`
+          },
+          gamedev: {
+            steps: [
+              `Создай пустую тестовую сцену в движке и собери базовый прототип механики «${node.title}».`,
+              `Настрой параметры так, чтобы взаимодействие ощущалось отзывчиво (визуальный отклик, тайминги или звук).`,
+              `Протестируй сцену в игровом режиме 5 минут, найди 2 слабых места и исправь их.`
+            ],
+            verify: `Тестовая сцена по «${node.title}» стабильно работает в Play-режиме без багов и просадок FPS.`
+          },
+          design: {
+            steps: [
+              `Собери 8 сильных референсов по теме «${node.title}» и выдели в них 3 повторяющихся приема.`,
+              `Сделай 2 черновых варианта своей работы с разной композицией или ритмом.`,
+              `Доведи лучший вариант до чистовика, проверь выравнивание, контраст и отступы.`
+            ],
+            verify: `Готовый макет или арт по «${node.title}» выглядит чисто и собран аккуратно по слоям.`
+          },
+          business: {
+            steps: [
+              `Разбери 2 реальных кейса компаний или проектов, где сработал инструмент «${node.title}».`,
+              `Сделай собственную таблицу расчетов или одностраничный документ, применив «${node.title}» к своей идее.`,
+              `Покажи расчет опытному знакомому или проверь его на 3 жестких вопросах (где узкое место и риск).`
+            ],
+            verify: `Есть конкретный документ или таблица с цифрами, на основе которых можно принять решение.`
+          },
+          science: {
+            steps: [
+              `Разбери главные определения и формулы темы «${node.title}» на простом наглядном примере.`,
+              `Реши самостоятельно 5 практических задач нарастающей сложности без подглядывания в ответ.`,
+              `Напиши короткий конспект-шпаргалку: где «${node.title}» применяется в реальной технике или природе.`
+            ],
+            verify: `Все 5 задач решены верно, а логику вывода можно пересказать без учебника.`
+          },
+          media: {
+            steps: [
+              `Разбери 3 успешных примера из индустрии по теме «${node.title}» и запиши таймкоды сильных приемов.`,
+              `Сделай короткую практическую пробу (30–60 секунд или 1 законченный фрагмент) с применением этих приемов.`,
+              `Пересмотри результат на следующий день свежим взглядом и вырежи все лишнее.`
+            ],
+            verify: `Есть готовый экспорт материала по «${node.title}», который не стыдно показать аудитории.`
+          },
+          lang: {
+            steps: [
+              `Выпиши 15 ключевых конструкций или правил по теме «${node.title}» с живыми примерами использования.`,
+              `Проведи 20-минутную активную практику: проговори вслух, напиши мини-диалог или разбери реальный кейс.`,
+              `Запиши себя на диктофон или проверь текст, выпиши 3 главные ошибки и отработай их повторно.`
+            ],
+            verify: `Ты свободно применяешь материал «${node.title}» в живой речи или на практике без пауз.`
+          },
+          life: {
+            steps: [
+              `Замерь свою текущую точку старта по теме «${node.title}» (цифры, самочувствие или время).`,
+              `Сделай минимальную версию практики «${node.title}» 3 раза на этой неделе, фиксируя ощущения в заметке.`,
+              `Убери главное препятствие, которое мешает делать это регулярно, и закрепи время в расписании.`
+            ],
+            verify: `Выполнено минимум 3 осознанных подхода с записанным результатом и понятным планом дальше.`
+          }
+        };
+        return domainTemplates[d] || domainTemplates.it;
+      }
+
+      if (node.tier === 4) {
+        return {
+          steps: [
+            `Возьми свой предыдущий результат по теме «${baseTopic}» и поставь конкретную задачу на этап «${stepLabel}».`,
+            `Выполни 3 целевых итерации улучшения: замерь исходное состояние, внеси правку и сравни эффект.`,
+            `Зафиксируй в короткой заметке 2 ошибки, которые допустил на этапе «${stepLabel}», чтобы не повторять их.`
+          ],
+          verify: `Работа по теме «${baseTopic}» заметно улучшилась именно по критерию «${stepLabel}».`
+        };
+      }
+
+      // Tier 5: Финальное мастерство
+      return {
+        steps: [
+          `Спроектируй законченный итоговый проект по теме «${baseTopic}» с акцентом на «${stepLabel}».`,
+          `Доведи проект до полностью рабочего, чистого состояния без заглушек и недоделок.`,
+          `Опубликуй результат (GitHub, портфолио, тест с друзьями или живой запуск) и собери минимум 3 отзыва.`
+        ],
+        verify: `Есть завершенный публичный артефакт уровня «${stepLabel}» по теме «${baseTopic}».`
+      };
+    }
+
+    // Готовые кросс-сферные билды
+    const BUILD_DEFS = [
+      {
+        id: 'roblox_creator',
+        title: 'Создатель игр в Roblox',
+        desc: 'Полный цикл разработки успешного режима: код на Luau, геймдизайн, стилизованный 3D-арт, звук и виральный рост.',
+        tags: ['Геймдев', '3D', 'Звук', 'Маркетинг'],
+        targets: [
+          'Скриптинг на Luau', 'Клиент-сервер и Remotes', 'Физика и конвейеры',
+          'DataStore и экономика', 'NPC и Pathfinding', 'Монетизация и аналитика',
+          'Core Loop и удержание', 'Кооп-механики', 'Blender и сетка',
+          'Стилизованный арт', 'Саунд-дизайн SFX', 'Виральные механики'
+        ]
+      },
+      {
+        id: 'ai_engineer',
+        title: 'AI-разработчик и архитектор агентов',
+        desc: 'Создание современных продуктов на базе LLM, нейросетей, векторных баз и надежного серверного кода.',
+        tags: ['AI / ML', 'Backend', 'Математика', 'Стартапы'],
+        targets: [
+          'Python для Data Science', 'Классический ML', 'Нейросети и PyTorch',
+          'LLM и промпт-инжиниринг', 'RAG и векторные базы', 'AI-агенты и инструменты',
+          'REST и GraphQL API', 'Docker и контейнеры', 'Линейная алгебра',
+          'Теория вероятностей', 'Сборка MVP за неделю'
+        ]
+      },
+      {
+        id: 'indie_hacker',
+        title: 'Соло-стартапер (Indie Hacker)',
+        desc: 'Умение в одиночку найти проблему, собрать красивый веб-сервис, запустить его на рынок и вывести на доход.',
+        tags: ['Frontend', 'Backend', 'UI/UX', 'Бизнес'],
+        targets: [
+          'HTML/CSS и сетки', 'JavaScript ES2025', 'TypeScript', 'React и состояние',
+          'Web-анимации и Canvas', 'REST и GraphQL API', 'SQL и индексы',
+          'Пользовательские сценарии', 'Figma и Auto Layout',
+          'Поиск реальных проблем', 'Сборка MVP за неделю', 'Юнит-экономика',
+          'SEO и органика', 'Глубокая работа Deep Work'
+        ]
+      },
+      {
+        id: 'youtube_creator',
+        title: 'YouTube-креатор и продюсер',
+        desc: 'Запуск сильного медиа-канала: сценарии, удержание зрителя, динамичный монтаж, обложки и харизматичная речь.',
+        tags: ['YouTube', 'Монтаж', 'Дизайн', 'Риторика'],
+        targets: [
+          'Кликабельные превью', 'Хуки первых 15 секунд', 'Анализ удержания',
+          'Сценарии длинных видео', 'Свет и кадр в студии', 'Ритм и склейки',
+          'Цветокоррекция DaVinci', 'Динамика для Shorts/Reels',
+          'Сторителлинг', 'Типографика и шрифты', 'Дикция и голос', 'Комьюнити-менеджмент'
+        ]
+      },
+      {
+        id: 'tech_artist_3d',
+        title: '3D и Unreal Engine художник',
+        desc: 'Создание кинематографичных сцен, персонажей, эффектов и интерактивных миров на современном движке.',
+        tags: ['Unreal Engine 5', '3D', 'Моушн', 'Арт'],
+        targets: [
+          'Blueprints и C++', 'Lumen и Nanite', 'Niagara VFX', 'Оптимизация FPS',
+          'Blender и сетка', 'Скульптинг персонажей', 'UV-развертка',
+          'PBR-текстуринг', 'Риггинг и скиннинг', '12 принципов анимации',
+          '3D-моушн и камеры', 'Свет и рендер'
+        ]
+      },
+      {
+        id: 'robotics_engineer',
+        title: 'Инженер робототехники и DIY',
+        desc: 'Путь от пайки плат и микроконтроллеров к автономным роботам с компьютерным зрением и умной навигацией.',
+        tags: ['Роботы', 'Электроника', 'Физика', 'AI'],
+        targets: [
+          'Схемотехника и пайка', 'Arduino и ESP32', 'Разводка печатных плат',
+          'Кинематика манипуляторов', 'Датчики и лидары', 'PID-регуляторы',
+          'Компьютерное зрение', 'ROS2 архитектура', 'Автономная навигация',
+          'Классическая механика', 'Электромагнетизм', 'Python для Data Science'
+        ]
+      }
+    ];
+
+    // =========================================================================
+    // 2. СБОРКА ГРАФА И ОРГАНИЧНАЯ БЕЗЬЕ-УКЛАДКА
+    // =========================================================================
+    const nodes = [];
+    const edges = [];
+    const nodeById = new Map();
+
+    function hashStr(str) {
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return ((h >>> 0) % 10000) / 10000;
+    }
+
+    function createNode(data) {
+      const n = {
+        id: data.id,
+        title: data.title,
+        tier: data.tier,
+        domainId: data.domainId,
+        domainName: data.domainName,
+        color: data.color,
+        parentId: data.parentId || null,
+        children: [],
+        xp: data.xp,
+        hours: data.hours,
+        desc: data.desc,
+        x: 0, y: 0, angle: 0, radius: 0,
+        r: data.r,
+        leafCount: 0
+      };
+      nodes.push(n);
+      nodeById.set(n.id, n);
+      if (n.parentId) {
+        const p = nodeById.get(n.parentId);
+        p.children.push(n);
+        edges.push({ from: p, to: n, cp1x: 0, cp1y: 0, cp2x: 0, cp2y: 0 });
+      }
+      return n;
+    }
+
+    const rootNode = createNode({
+      id: 'core',
+      title: 'Точка Старта',
+      tier: 0,
+      domainId: 'core',
+      domainName: 'Ядро Вселенной',
+      color: '#ffffff',
+      xp: 0, hours: 0, r: 34,
+      desc: 'Твоя отправная точка. В каждом узле теперь есть пошаговый чек-лист точных заданий, который подсказывает, что именно сделать для освоения навыка.'
+    });
+
+    let idCounter = 1;
+    for (const d of DOMAINS) {
+      const domNode = createNode({
+        id: 'dom_' + d.id,
+        title: d.name,
+        tier: 1,
+        domainId: d.id,
+        domainName: d.name,
+        color: d.color,
+        parentId: rootNode.id,
+        xp: 120, hours: 5, r: 23,
+        desc: `Глобальная ветка «${d.name}». Включает ${d.specs.length} специализаций и сотни практических узлов с точными заданиями.`
+      });
+
+      for (const spec of d.specs) {
+        const specNode = createNode({
+          id: 'sp_' + (idCounter++),
+          title: spec.name,
+          tier: 2,
+          domainId: d.id,
+          domainName: `${d.name} / ${spec.name}`,
+          color: d.color,
+          parentId: domNode.id,
+          xp: 180, hours: 12, r: 15,
+          desc: `Специализация «${spec.name}» в сфере «${d.name}». Открывает 6 ключевых тем и десятки прикладных шагов.`
+        });
+
+        for (const topic of spec.topics) {
+          const topicNode = createNode({
+            id: 'tp_' + (idCounter++),
+            title: topic,
+            tier: 3,
+            domainId: d.id,
+            domainName: `${d.name} / ${spec.name}`,
+            color: d.color,
+            parentId: specNode.id,
+            xp: 220, hours: 18, r: 10,
+            desc: `Фундаментальный модуль «${topic}» внутри специализации «${spec.name}».`
+          });
+
+          d.t4.forEach((stepName, sIdx) => {
+            const subNode = createNode({
+              id: 'sk_' + (idCounter++),
+              title: `${topic}: ${stepName}`,
+              tier: 4,
+              domainId: d.id,
+              domainName: `${spec.name} / ${topic}`,
+              color: d.color,
+              parentId: topicNode.id,
+              xp: 150 + sIdx * 40,
+              hours: 8 + sIdx * 4,
+              r: 6.5,
+              desc: `Углубленный практический этап «${stepName}» по теме «${topic}».`
+            });
+
+            const branches = sIdx === 2 ? d.t5 : [d.t5[sIdx % d.t5.length]];
+            branches.forEach((masterName, mIdx) => {
+              createNode({
+                id: 'ms_' + (idCounter++),
+                title: `${topic}: ${masterName}`,
+                tier: 5,
+                domainId: d.id,
+                domainName: `${spec.name} / Мастерство`,
+                color: d.color,
+                parentId: subNode.id,
+                xp: 300 + mIdx * 100,
+                hours: 15 + mIdx * 10,
+                r: 4.8,
+                desc: `Финальная ступень мастерства «${masterName}» для темы «${topic}».`
+              });
+            });
+          });
+        }
+      }
+    }
+
+    function computeLeaves(node) {
+      if (node.children.length === 0) { node.leafCount = 1; return 1; }
+      let sum = 0;
+      for (const c of node.children) sum += computeLeaves(c);
+      node.leafCount = sum;
+      return sum;
+    }
+    computeLeaves(rootNode);
+
+    const STEP_LEN = [0, 420, 680, 1020, 1180, 1020];
+    const STEP_JITTER = [0, 75, 160, 260, 310, 290];
+
+    function layoutOrganic(node, startAngle, endAngle, parentRadius) {
+      const h1 = hashStr(node.id + '_a');
+      const h2 = hashStr(node.id + '_r');
+      const span = endAngle - startAngle;
+      const jitterAngle = node.tier >= 2 ? (h1 - 0.5) * span * 0.28 : 0;
+      const swirl = node.tier * 0.045 * (node.tier % 2 === 0 ? 1 : -0.6);
+      const ang = (startAngle + endAngle) / 2 + jitterAngle + swirl;
+      node.angle = ang;
+
+      if (node.tier === 0) {
+        node.radius = 0; node.x = 0; node.y = 0;
+      } else {
+        const len = STEP_LEN[node.tier] + (h2 - 0.5) * 2 * STEP_JITTER[node.tier];
+        node.radius = parentRadius + len;
+        node.x = Math.cos(ang) * node.radius;
+        node.y = Math.sin(ang) * node.radius;
+      }
+
+      if (node.children.length === 0) return;
+      const pad = node.tier === 0 ? 0.075 : (node.tier === 1 ? 0.022 : (node.tier === 2 ? 0.004 : 0));
+      const usable = Math.max(0.0001, span - pad * node.children.length);
+      let cursor = startAngle;
+
+      for (const child of node.children) {
+        const share = usable * (child.leafCount / node.leafCount);
+        const cStart = cursor + pad / 2;
+        const cEnd = cStart + share;
+        layoutOrganic(child, cStart, cEnd, node.radius);
+        cursor += share + pad;
+      }
+    }
+    layoutOrganic(rootNode, 0, Math.PI * 2, 0);
+
+    for (const e of edges) {
+      const a = e.from, b = e.to;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const nx = -dy / dist, ny = dx / dist;
+      const h = hashStr(b.id + '_curve') - 0.5;
+
+      if (a.tier === 0) {
+        const bend = dist * (0.18 + h * 0.14);
+        e.cp1x = a.x + dx * 0.35 + nx * bend;
+        e.cp1y = a.y + dy * 0.35 + ny * bend;
+        e.cp2x = a.x + dx * 0.72 - nx * bend * 0.45;
+        e.cp2y = a.y + dy * 0.72 - ny * bend * 0.45;
+      } else {
+        const trunkDirX = Math.cos(a.angle), trunkDirY = Math.sin(a.angle);
+        const childDirX = Math.cos(b.angle), childDirY = Math.sin(b.angle);
+        const bend = dist * h * 0.16;
+        e.cp1x = a.x + trunkDirX * dist * 0.46 + nx * bend;
+        e.cp1y = a.y + trunkDirY * dist * 0.46 + ny * bend;
+        e.cp2x = b.x - childDirX * dist * 0.36 - nx * bend * 0.5;
+        e.cp2y = b.y - childDirY * dist * 0.36 - ny * bend * 0.5;
+      }
+    }
+
+    const BUILDS = BUILD_DEFS.map(def => {
+      const targetNodes = [];
+      const fullSet = new Set();
+      const targetTitleSet = new Set(def.targets);
+      for (const n of nodes) {
+        if (n.tier === 3 && targetTitleSet.has(n.title)) {
+          targetNodes.push(n);
+          if (n.children[0]) targetNodes.push(n.children[0]);
+        }
+      }
+      for (const tn of targetNodes) {
+        let cur = tn;
+        while (cur) {
+          fullSet.add(cur.id);
+          cur = cur.parentId ? nodeById.get(cur.parentId) : null;
+        }
+      }
+      const ordered = [...fullSet].map(id => nodeById.get(id)).sort((a, b) => a.tier - b.tier);
+      return { ...def, nodeSet: fullSet, ordered };
+    });
+
+    document.getElementById('totalCount').textContent = nodes.length.toLocaleString('ru-RU');
+
+    // =========================================================================
+    // 3. СОСТОЯНИЕ ИГРОКА, ПРОГРЕСС ЗАДАНИЙ, ЗВУК И СОХРАНЕНИЕ
+    // =========================================================================
+    const STORE_KEY = 'skillUniverseRPG_v3';
+    let unlocked = new Set(['core']);
+    let taskProgress = {}; // { [nodeId]: [bool, bool, bool] }
+    let activeBuild = null;
+    let soundEnabled = true;
+
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORE_KEY) || localStorage.getItem('skillUniverseRPG_v2') || 'null');
+      if (saved && Array.isArray(saved.unlocked)) {
+        unlocked = new Set(['core', ...saved.unlocked.filter(id => nodeById.has(id))]);
+      }
+      if (saved && saved.taskProgress && typeof saved.taskProgress === 'object') {
+        taskProgress = saved.taskProgress;
+      }
+      if (saved && saved.activeBuildId) {
+        activeBuild = BUILDS.find(b => b.id === saved.activeBuildId) || null;
+      }
+    } catch (_) {}
+
+    function persist() {
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        unlocked: [...unlocked],
+        taskProgress,
+        activeBuildId: activeBuild ? activeBuild.id : null
+      }));
+    }
+
+    function isAvailable(node) {
+      if (unlocked.has(node.id)) return true;
+      return node.parentId && unlocked.has(node.parentId);
+    }
+
+    function getTaskStats(node) {
+      const info = getNodeTasks(node);
+      const total = info.steps.length;
+      if (unlocked.has(node.id)) return { done: total, total, ratio: 1, info, flags: info.steps.map(() => true) };
+      const arr = taskProgress[node.id] || [];
+      const flags = info.steps.map((_, i) => Boolean(arr[i]));
+      const done = flags.filter(Boolean).length;
+      return { done, total, ratio: total ? done / total : 0, info, flags };
+    }
+
+    let audioCtx = null;
+    function playTone(freq, dur, vol) {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(vol, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + dur + 0.03);
+      } catch (_) {}
+    }
+
+    function playChime(tier) {
+      const base = 270 + tier * 72;
+      playTone(base, 0.42, 0.06);
+      setTimeout(() => playTone(base * 1.25, 0.42, 0.055), 55);
+      setTimeout(() => playTone(base * 1.5, 0.48, 0.055), 110);
+    }
+
+    function getBuildProgress(build) {
+      const total = Math.max(1, build.ordered.length - 1);
+      let done = 0;
+      for (const n of build.ordered) if (n.id !== 'core' && unlocked.has(n.id)) done++;
+      return { done, total, pct: Math.round((done / total) * 100) };
+    }
+
+    function renderBuildsList() {
+      const list = document.getElementById('buildsList');
+      list.innerHTML = '';
+      for (const b of BUILDS) {
+        const prog = getBuildProgress(b);
+        const card = document.createElement('div');
+        card.className = 'build-card' + (activeBuild && activeBuild.id === b.id ? ' active' : '');
+        card.innerHTML = `
+          <div class="build-card-top">
+            <span class="build-card-title">${b.title}</span>
+            <span class="build-card-pct">${prog.pct}%</span>
+          </div>
+          <p class="build-card-desc">${b.desc}</p>
+          <div class="build-tags">${b.tags.map(t => `<span class="build-tag">${t}</span>`).join('')}</div>
+          <div class="mini-bar"><div class="mini-bar-fill" style="width:${prog.pct}%"></div></div>
+        `;
+        card.onclick = () => selectBuild(b);
+        list.appendChild(card);
+      }
+    }
+
+    function updateBuildBanner() {
+      const banner = document.getElementById('buildBanner');
+      if (!activeBuild) { banner.classList.remove('open'); return; }
+      const prog = getBuildProgress(activeBuild);
+      document.getElementById('buildBannerTitle').textContent = activeBuild.title;
+      document.getElementById('buildBannerPct').textContent = `${prog.pct}%`;
+      document.getElementById('buildBannerBar').style.width = `${prog.pct}%`;
+      document.getElementById('buildBannerInfo').textContent =
+        `Освоено ${prog.done} из ${prog.total} узлов билда. Подсвечено созвездие целей на карте.`;
+      banner.classList.add('open');
+    }
+
+    function selectBuild(build) {
+      activeBuild = build;
+      persist();
+      renderBuildsList();
+      updateBuildBanner();
+      document.getElementById('buildsDrawer').classList.remove('open');
+      flyTo(0, 0, 0.105);
+    }
+
+    function updateProfileUI() {
+      let xp = 0, hours = 0;
+      const domainCounts = {};
+      for (const id of unlocked) {
+        const n = nodeById.get(id);
+        if (!n) continue;
+        xp += n.xp;
+        hours += n.hours;
+        if (n.domainId !== 'core') domainCounts[n.domainId] = (domainCounts[n.domainId] || 0) + 1;
+      }
+
+      const level = Math.floor(Math.sqrt(xp / 180)) + 1;
+      const prevLvlXp = Math.pow(level - 1, 2) * 180;
+      const nextLvlXp = Math.pow(level, 2) * 180;
+      const pct = Math.min(100, Math.max(0, ((xp - prevLvlXp) / (nextLvlXp - prevLvlXp)) * 100));
+
+      let topDomain = null, topCount = 0, activeDomains = 0;
+      for (const [dId, cnt] of Object.entries(domainCounts)) {
+        if (cnt > 0) activeDomains++;
+        if (cnt > topCount) { topCount = cnt; topDomain = dId; }
+      }
+
+      let title = 'Странник Знаний';
+      if (activeDomains >= 4 && unlocked.size >= 12) title = 'Полимат Вселенной';
+      else if (topDomain) {
+        const domObj = DOMAINS.find(d => d.id === topDomain);
+        if (domObj) title = domObj.rpgClass;
+      }
+
+      document.getElementById('classTitle').textContent = title;
+      document.getElementById('levelBadge').textContent = `Уровень ${level}`;
+      document.getElementById('xpFill').style.width = pct.toFixed(1) + '%';
+      document.getElementById('unlockedCount').textContent = unlocked.size.toLocaleString('ru-RU');
+      document.getElementById('xpText').textContent = xp.toLocaleString('ru-RU');
+      document.getElementById('hoursText').textContent = `${hours} ч`;
+      updateBuildBanner();
+      renderBuildsList();
+    }
+
+    // =========================================================================
+    // 4. КАМЕРА, БЕЗЬЕ-ИМПУЛЬСЫ И РЕНДЕР CANVAS (60 FPS)
+    // =========================================================================
+    const canvas = document.getElementById('graphCanvas');
+    const ctx = canvas.getContext('2d');
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let width = window.innerWidth, height = window.innerHeight;
+
+    const cam = { x: 0, y: 0, scale: 0.14, tx: 0, ty: 0, tScale: 0.14 };
+    let hoveredNode = null, selectedNode = null;
+    let routeSet = new Set(), routeList = [];
+    let particles = [], pulses = [];
+
+    const stars = Array.from({ length: 260 }, () => ({
+      x: Math.random(), y: Math.random(),
+      r: 0.5 + Math.random() * 1.4,
+      a: 0.2 + Math.random() * 0.55,
+      sp: 0.5 + Math.random() * 1.5
+    }));
+
+    const nebulas = DOMAINS.map(d => {
+      const dn = nodeById.get('dom_' + d.id);
+      return { x: dn.x * 5.2, y: dn.y * 5.2, r: 2200, color: d.color };
+    });
+
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function screenToWorld(sx, sy) {
+      return {
+        x: (sx - width / 2) / cam.scale + cam.x,
+        y: (sy - height / 2) / cam.scale + cam.y
+      };
+    }
+
+    function flyTo(wx, wy, scale) {
+      cam.tx = wx; cam.ty = wy;
+      cam.tScale = Math.max(0.065, Math.min(2.6, scale));
+    }
+
+    function spawnBurst(wx, wy, color) {
+      for (let i = 0; i < 28; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 25 + Math.random() * 115;
+        particles.push({
+          x: wx, y: wy,
+          vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+          color, life: 1, size: 2 + Math.random() * 3.5
+        });
+      }
+    }
+
+    function evalCubicBezier(e, t) {
+      const u = 1 - t;
+      const tt = t * t, uu = u * u;
+      return {
+        x: uu * u * e.from.x + 3 * uu * t * e.cp1x + 3 * u * tt * e.cp2x + tt * t * e.to.x,
+        y: uu * u * e.from.y + 3 * uu * t * e.cp1y + 3 * u * tt * e.cp2y + tt * t * e.to.y
+      };
+    }
+
+    function buildRouteTo(targetNode) {
+      routeSet.clear(); routeList = [];
+      let curr = targetNode;
+      const chain = [];
+      while (curr) {
+        chain.push(curr);
+        if (unlocked.has(curr.id)) break;
+        curr = curr.parentId ? nodeById.get(curr.parentId) : null;
+      }
+      chain.reverse();
+      let needHours = 0, needXp = 0, needSteps = 0;
+      for (const n of chain) {
+        routeSet.add(n.id); routeList.push(n);
+        if (!unlocked.has(n.id)) { needHours += n.hours; needXp += n.xp; needSteps++; }
+      }
+      const banner = document.getElementById('routeBanner');
+      if (needSteps === 0) { banner.classList.remove('open'); routeSet.clear(); routeList = []; return; }
+      document.getElementById('routeInfo').textContent =
+        `Цель: ${targetNode.title}. Шагов: ${needSteps} (~${needHours} ч, +${needXp} XP).`;
+      banner.classList.add('open');
+    }
+
+    let lastTime = performance.now();
+    function render(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+
+      cam.x += (cam.tx - cam.x) * 0.14;
+      cam.y += (cam.ty - cam.y) * 0.14;
+      cam.scale += (cam.tScale - cam.scale) * 0.14;
+
+      ctx.fillStyle = '#04060c';
+      ctx.fillRect(0, 0, width, height);
+
+      for (const s of stars) {
+        const px = ((s.x * width - cam.x * 0.018) % width + width) % width;
+        const py = ((s.y * height - cam.y * 0.018) % height + height) % height;
+        const twinkle = 0.5 + 0.5 * Math.sin(now * 0.0014 * s.sp + s.x * 12);
+        ctx.fillStyle = `rgba(210, 225, 255, ${(s.a * twinkle).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(px, py, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const pad = 260 / cam.scale;
+      const minX = cam.x - (width / 2) / cam.scale - pad;
+      const maxX = cam.x + (width / 2) / cam.scale + pad;
+      const minY = cam.y - (height / 2) / cam.scale - pad;
+      const maxY = cam.y + (height / 2) / cam.scale + pad;
+
+      ctx.save();
+      ctx.translate(width / 2, height / 2);
+      ctx.scale(cam.scale, cam.scale);
+      ctx.translate(-cam.x, -cam.y);
+
+      for (const nb of nebulas) {
+        const g = ctx.createRadialGradient(nb.x, nb.y, 120, nb.x, nb.y, nb.r);
+        g.addColorStop(0, nb.color + '14');
+        g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(nb.x, nb.y, nb.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const hasBuild = Boolean(activeBuild);
+      const bSet = hasBuild ? activeBuild.nodeSet : null;
+
+      for (let i = 0; i < edges.length; i++) {
+        const e = edges[i];
+        const a = e.from, b = e.to;
+        if ((a.x < minX && b.x < minX) || (a.x > maxX && b.x > maxX) ||
+            (a.y < minY && b.y < minY) || (a.y > maxY && b.y > maxY)) continue;
+
+        const isRoute = routeSet.has(a.id) && routeSet.has(b.id);
+        const isBuildEdge = hasBuild && bSet.has(a.id) && bSet.has(b.id);
+        const bothUnlocked = unlocked.has(a.id) && unlocked.has(b.id);
+        const avail = unlocked.has(a.id) && !unlocked.has(b.id);
+
+        if (isRoute) {
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 3.2 / cam.scale;
+        } else if (isBuildEdge) {
+          ctx.strokeStyle = bothUnlocked ? '#34d399' : '#22d3ee';
+          ctx.lineWidth = (bothUnlocked ? 3.4 : 2.5) / Math.max(0.28, cam.scale);
+        } else if (bothUnlocked) {
+          ctx.strokeStyle = b.color;
+          ctx.lineWidth = Math.max(1.5, (5.2 - b.tier * 0.65)) / Math.sqrt(cam.scale);
+        } else if (avail) {
+          ctx.strokeStyle = hasBuild ? 'rgba(255,255,255,0.12)' : 'rgba(255, 255, 255, 0.28)';
+          ctx.lineWidth = 1.5 / cam.scale;
+        } else {
+          const alpha = hasBuild ? (b.tier <= 2 ? 0.045 : 0.025) : (b.tier <= 2 ? 0.14 : 0.075);
+          ctx.strokeStyle = `rgba(165, 180, 210, ${alpha})`;
+          ctx.lineWidth = (b.tier <= 1 ? 2.2 : 1.1) / Math.max(0.35, cam.scale);
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.bezierCurveTo(e.cp1x, e.cp1y, e.cp2x, e.cp2y, b.x, b.y);
+        ctx.stroke();
+      }
+
+      if (Math.random() < 0.16) {
+        let pickEdge = null;
+        if (hasBuild && Math.random() < 0.65) {
+          const bEdges = edges.filter(e => bSet.has(e.from.id) && bSet.has(e.to.id));
+          if (bEdges.length) pickEdge = bEdges[Math.floor(Math.random() * bEdges.length)];
+        } else if (unlocked.size > 1) {
+          const uEdges = edges.filter(e => unlocked.has(e.from.id) && unlocked.has(e.to.id));
+          if (uEdges.length) pickEdge = uEdges[Math.floor(Math.random() * uEdges.length)];
+        }
+        if (pickEdge) pulses.push({ edge: pickEdge, t: 0, color: hasBuild ? '#67e8f9' : '#ffffff' });
+      }
+      pulses = pulses.filter(p => p.t < 1);
+      for (const p of pulses) {
+        p.t += dt * 0.95;
+        const pt = evalCubicBezier(p.edge, p.t);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 3.2 / cam.scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (n.x < minX || n.x > maxX || n.y < minY || n.y > maxY) continue;
+
+        const isUnl = unlocked.has(n.id);
+        const isAv = isAvailable(n);
+        const isSel = selectedNode === n;
+        const isHov = hoveredNode === n;
+        const isRt = routeSet.has(n.id);
+        const isBld = hasBuild && bSet.has(n.id);
+        const rawTaskArr = !isUnl ? taskProgress[n.id] : null;
+        const doneTasks = rawTaskArr ? rawTaskArr.filter(Boolean).length : 0;
+        const inProgress = !isUnl && doneTasks > 0;
+        const dimmed = hasBuild && !isBld && !isSel && !isHov && !isRt && !inProgress && n.tier > 0;
+
+        if ((isUnl || isSel || isRt || isBld || inProgress || n.tier <= 1) && !dimmed) {
+          const glowR = n.r * (isSel || isBld ? 2.7 : 2.0);
+          const g = ctx.createRadialGradient(n.x, n.y, n.r * 0.2, n.x, n.y, glowR);
+          const gc = isRt && !isUnl ? '#fbbf24' : (inProgress ? '#34d399' : (isBld && !isUnl ? '#22d3ee' : n.color));
+          g.addColorStop(0, gc + (isUnl || isSel || isBld || inProgress ? '90' : '38'));
+          g.addColorStop(1, 'transparent');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, glowR, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.beginPath();
+        const rad = n.r * (isHov ? 1.25 : (isBld && n.tier >= 3 ? 1.22 : 1));
+        ctx.arc(n.x, n.y, rad, 0, Math.PI * 2);
+
+        if (isUnl) {
+          ctx.fillStyle = isBld ? '#34d399' : n.color;
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2 / Math.max(0.4, cam.scale);
+          ctx.stroke();
+        } else if (isRt) {
+          ctx.fillStyle = '#1e1b12';
+          ctx.fill();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 2.4 / Math.max(0.4, cam.scale);
+          ctx.stroke();
+        } else if (isBld) {
+          ctx.fillStyle = '#0c2330';
+          ctx.fill();
+          ctx.strokeStyle = '#22d3ee';
+          ctx.lineWidth = 2.3 / Math.max(0.35, cam.scale);
+          ctx.stroke();
+        } else if (isAv && !dimmed) {
+          ctx.fillStyle = '#151c2f';
+          ctx.fill();
+          ctx.strokeStyle = n.color;
+          ctx.lineWidth = 1.8 / Math.max(0.4, cam.scale);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = dimmed ? '#070a13' : '#0d1222';
+          ctx.fill();
+          ctx.strokeStyle = n.color + (dimmed ? '1c' : '44');
+          ctx.lineWidth = 1.1 / Math.max(0.5, cam.scale);
+          ctx.stroke();
+        }
+
+        // Светящаяся дуга прогресса по чек-листу заданий прямо на карте
+        if (inProgress) {
+          const totalT = rawTaskArr.length || 3;
+          const ratio = Math.min(1, doneTasks / totalT);
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, rad + 4 / Math.max(0.35, cam.scale), -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio);
+          ctx.strokeStyle = '#34d399';
+          ctx.lineWidth = 2.6 / Math.max(0.4, cam.scale);
+          ctx.stroke();
+        }
+
+        const showLabel =
+          n.tier === 0 ||
+          (n.tier === 1 && cam.scale > 0.075) ||
+          (n.tier === 2 && cam.scale > 0.19 && !dimmed) ||
+          (n.tier === 3 && (cam.scale > 0.42 || (isBld && cam.scale > 0.15)) && !dimmed) ||
+          (n.tier === 4 && (cam.scale > 0.85 || (isBld && cam.scale > 0.28)) && !dimmed) ||
+          (n.tier === 5 && cam.scale > 1.25 && !dimmed) ||
+          isSel || isHov || isRt || inProgress;
+
+        if (showLabel) {
+          const fontSize = Math.max(10, Math.min(18, (15 - n.tier * 1.35))) / Math.pow(cam.scale, 0.72);
+          ctx.font = `${n.tier <= 2 || isBld ? '700' : '500'} ${fontSize.toFixed(1)}px Inter, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillStyle = isUnl || isSel || isHov ? '#ffffff'
+            : (inProgress ? '#6ee7b7' : (isRt ? '#fde68a' : (isBld ? '#a5f3fc' : 'rgba(226, 232, 240, 0.78)')));
+          const shortTitle = n.title.length > 34 && !isSel && !isHov ? n.title.slice(0, 32) + '…' : n.title;
+          ctx.fillText(shortTitle, n.x, n.y + rad + 5 / cam.scale);
+        }
+      }
+
+      particles = particles.filter(p => p.life > 0.02);
+      for (const p of particles) {
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.vx *= 0.94; p.vy *= 0.94;
+        p.life -= dt * 1.4;
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size / Math.max(0.3, cam.scale), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+
+    // =========================================================================
+    // 5. УПРАВЛЕНИЕ, ИНСПЕКТОР С ЗАДАНИЯМИ, ПОИСК И БИЛДЫ
+    // =========================================================================
+    let isDragging = false, dragStart = { x: 0, y: 0 }, movedDist = 0;
+
+    function findNodeAt(sx, sy) {
+      const w = screenToWorld(sx, sy);
+      let best = null, bestDist = Infinity;
+      const hitPad = 12 / cam.scale;
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i];
+        const dx = w.x - n.x, dy = w.y - n.y;
+        const limit = n.r + hitPad;
+        if (Math.abs(dx) > limit || Math.abs(dy) > limit) continue;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= limit && dist < bestDist) { bestDist = dist; best = n; }
+      }
+      return best;
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      isDragging = true; movedDist = 0;
+      dragStart = { x: e.clientX, y: e.clientY };
+      canvas.classList.add('dragging');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+        movedDist += Math.hypot(dx, dy);
+        cam.x -= dx / cam.scale; cam.y -= dy / cam.scale;
+        cam.tx = cam.x; cam.ty = cam.y;
+        dragStart = { x: e.clientX, y: e.clientY };
+        document.getElementById('tooltip').style.display = 'none';
+        return;
+      }
+      const hit = findNodeAt(e.clientX, e.clientY);
+      hoveredNode = hit;
+      canvas.style.cursor = hit ? 'pointer' : 'grab';
+      const tip = document.getElementById('tooltip');
+      if (hit) {
+        const ts = getTaskStats(hit);
+        const st = unlocked.has(hit.id)
+          ? 'Изучено'
+          : (ts.done > 0 ? `В процессе (${ts.done}/${ts.total} зад.)` : (isAvailable(hit) ? 'Доступно' : 'Заблокировано'));
+        tip.innerHTML = `<strong>${hit.title}</strong><span>${hit.domainName} · ${st}</span>`;
+        tip.style.left = Math.min(width - 260, e.clientX + 14) + 'px';
+        tip.style.top = Math.min(height - 70, e.clientY + 14) + 'px';
+        tip.style.display = 'block';
+      } else {
+        tip.style.display = 'none';
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      canvas.classList.remove('dragging');
+      if (movedDist < 6) {
+        const hit = findNodeAt(e.clientX, e.clientY);
+        if (hit) openInspector(hit);
+      }
+    });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const before = screenToWorld(e.clientX, e.clientY);
+      const factor = e.deltaY < 0 ? 1.18 : 0.85;
+      const newScale = Math.max(0.065, Math.min(2.6, cam.tScale * factor));
+      cam.tScale = newScale; cam.scale = newScale;
+      const after = screenToWorld(e.clientX, e.clientY);
+      cam.x += (before.x - after.x); cam.y += (before.y - after.y);
+      cam.tx = cam.x; cam.ty = cam.y;
+    }, { passive: false });
+
+    function completeNode(node) {
+      if (!node || unlocked.has(node.id) || !isAvailable(node)) return;
+      const stats = getTaskStats(node);
+      taskProgress[node.id] = stats.info.steps.map(() => true);
+      unlocked.add(node.id);
+      persist();
+      updateProfileUI();
+      spawnBurst(node.x, node.y, node.color);
+      playChime(node.tier);
+      openInspector(node);
+      if (routeList.length) buildRouteTo(routeList[routeList.length - 1]);
+    }
+
+    const inspEl = document.getElementById('inspector');
+    function openInspector(node) {
+      selectedNode = node;
+      const stats = getTaskStats(node);
+      const isUnl = unlocked.has(node.id);
+      const isAv = isAvailable(node);
+
+      document.getElementById('inspCrumb').textContent = node.domainName;
+      document.getElementById('inspCrumb').style.color = node.color;
+      document.getElementById('inspTitle').textContent = node.title;
+      document.getElementById('inspDesc').textContent = node.desc;
+      document.getElementById('inspXp').textContent = `+${node.xp} XP`;
+      document.getElementById('inspHours').textContent = `${node.hours} ч`;
+
+      // Отрисовка чек-листа заданий
+      document.getElementById('tasksCounter').textContent = `${stats.done} / ${stats.total}`;
+      document.getElementById('tasksBar').style.width = `${Math.round(stats.ratio * 100)}%`;
+      document.getElementById('taskVerify').innerHTML = `<span>Критерий сдачи:</span> ${stats.info.verify}`;
+
+      const listEl = document.getElementById('taskList');
+      listEl.innerHTML = '';
+      stats.info.steps.forEach((stepText, idx) => {
+        const checked = stats.flags[idx];
+        const row = document.createElement('div');
+        row.className = 'task-item' + (checked ? ' done' : '');
+        row.innerHTML = `
+          <div class="task-check">${checked ? '✓' : ''}</div>
+          <div class="task-text">${idx + 1}. ${stepText}</div>
+        `;
+        row.onclick = () => {
+          if (isUnl) return;
+          const arr = stats.info.steps.map((_, i) => Boolean((taskProgress[node.id] || [])[i]));
+          arr[idx] = !arr[idx];
+          taskProgress[node.id] = arr;
+          persist();
+          playTone(arr[idx] ? 520 : 340, 0.12, 0.04);
+          openInspector(node);
+        };
+        listEl.appendChild(row);
+      });
+
+      const btn = document.getElementById('unlockBtn');
+      const skipBtn = document.getElementById('skipBtn');
+
+      if (isUnl) {
+        btn.textContent = 'Навык освоен';
+        btn.className = 'btn-primary unlocked';
+        btn.disabled = true;
+        skipBtn.style.display = 'none';
+      } else if (!isAv) {
+        const parent = nodeById.get(node.parentId);
+        btn.textContent = `Сначала изучи: ${parent ? parent.title.slice(0, 24) : 'родителя'}`;
+        btn.className = 'btn-primary';
+        btn.disabled = true;
+        skipBtn.style.display = 'none';
+      } else if (stats.done === stats.total) {
+        btn.textContent = `Все задания выполнены! Забрать +${node.xp} XP`;
+        btn.className = 'btn-primary ready';
+        btn.disabled = false;
+        skipBtn.style.display = 'none';
+      } else {
+        btn.textContent = `Выполни задания выше (${stats.done} / ${stats.total})`;
+        btn.className = 'btn-primary';
+        btn.disabled = true;
+        skipBtn.style.display = 'block';
+      }
+
+      document.getElementById('routeBtn').style.display = isUnl ? 'none' : 'block';
+      inspEl.classList.add('open');
+    }
+
+    document.getElementById('closeInspBtn').onclick = () => { inspEl.classList.remove('open'); selectedNode = null; };
+    document.getElementById('unlockBtn').onclick = () => completeNode(selectedNode);
+    document.getElementById('skipBtn').onclick = () => completeNode(selectedNode);
+
+    document.getElementById('routeBtn').onclick = () => { if (selectedNode) buildRouteTo(selectedNode); };
+    document.getElementById('routeNextBtn').onclick = () => {
+      const next = routeList.find(n => !unlocked.has(n.id));
+      if (next) { flyTo(next.x, next.y, Math.max(0.7, 0.38 + next.tier * 0.24)); openInspector(next); }
+    };
+    document.getElementById('routeClearBtn').onclick = () => {
+      routeSet.clear(); routeList = [];
+      document.getElementById('routeBanner').classList.remove('open');
+    };
+
+    const drawer = document.getElementById('buildsDrawer');
+    document.getElementById('openBuildsBtn').onclick = () => drawer.classList.toggle('open');
+    document.getElementById('closeBuildsBtn').onclick = () => drawer.classList.remove('open');
+
+    document.getElementById('buildNextBtn').onclick = () => {
+      if (!activeBuild) return;
+      const next = activeBuild.ordered.find(n => !unlocked.has(n.id) && isAvailable(n));
+      if (next) { flyTo(next.x, next.y, Math.max(0.55, 0.32 + next.tier * 0.24)); openInspector(next); }
+    };
+
+    document.getElementById('buildClearBtn').onclick = () => {
+      activeBuild = null; persist(); updateBuildBanner(); renderBuildsList();
+    };
+
+    const domainBar = document.getElementById('domainBar');
+    const allBtn = document.createElement('button');
+    allBtn.className = 'domain-pill';
+    allBtn.innerHTML = `<span class="dot" style="background:#fff"></span>Весь мир`;
+    allBtn.onclick = () => flyTo(0, 0, 0.095);
+    domainBar.appendChild(allBtn);
+
+    for (const d of DOMAINS) {
+      const btn = document.createElement('button');
+      btn.className = 'domain-pill';
+      btn.innerHTML = `<span class="dot" style="background:${d.color}"></span>${d.name}`;
+      btn.onclick = () => {
+        const dn = nodeById.get('dom_' + d.id);
+        if (dn) { flyTo(dn.x * 2.5, dn.y * 2.5, 0.28); openInspector(dn); }
+      };
+      domainBar.appendChild(btn);
+    }
+
+    document.getElementById('zoomInBtn').onclick = () => flyTo(cam.tx, cam.ty, cam.tScale * 1.45);
+    document.getElementById('zoomOutBtn').onclick = () => flyTo(cam.tx, cam.ty, cam.tScale * 0.68);
+    document.getElementById('fitBtn').onclick = () => flyTo(0, 0, 0.095);
+    document.getElementById('soundBtn').onclick = (e) => {
+      soundEnabled = !soundEnabled;
+      e.target.classList.toggle('active', soundEnabled);
+    };
+    document.getElementById('resetBtn').onclick = () => {
+      if (!confirm('Сбросить весь прогресс и чек-листы на карте навыков?')) return;
+      unlocked = new Set(['core']);
+      taskProgress = {};
+      routeSet.clear(); routeList = [];
+      document.getElementById('routeBanner').classList.remove('open');
+      persist();
+      updateProfileUI();
+      if (selectedNode) openInspector(selectedNode);
+    };
+
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (q.length < 2) { searchResults.classList.remove('open'); searchResults.innerHTML = ''; return; }
+      const matches = [];
+      for (const n of nodes) {
+        if (n.title.toLowerCase().includes(q) || n.domainName.toLowerCase().includes(q)) {
+          matches.push(n);
+          if (matches.length >= 25) break;
+        }
+      }
+      if (!matches.length) {
+        searchResults.innerHTML = '<div class="search-item"><span class="search-item-sub">Ничего не найдено</span></div>';
+      } else {
+        searchResults.innerHTML = '';
+        for (const m of matches) {
+          const item = document.createElement('div');
+          item.className = 'search-item';
+          item.innerHTML = `
+            <div>
+              <div class="search-item-title">${m.title}</div>
+              <div class="search-item-sub">${m.domainName} · Ур.${m.tier}</div>
+            </div>
+            <span class="dot" style="background:${m.color}"></span>
+          `;
+          item.onclick = () => {
+            flyTo(m.x, m.y, Math.max(0.55, 0.34 + m.tier * 0.26));
+            openInspector(m);
+            searchResults.classList.remove('open');
+          };
+          searchResults.appendChild(item);
+        }
+      }
+      searchResults.classList.add('open');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.search-wrap')) searchResults.classList.remove('open');
+    });
+
+    updateProfileUI();
+    openInspector(rootNode);
+  </script>
+</body>
+</html>
